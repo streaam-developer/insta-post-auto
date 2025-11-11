@@ -12,13 +12,23 @@ class Instagram:
         self.cl = Client()
         self.username = username
         self.password = password
-        try:
-            print("Logging in to Instagram...")
+        session_file = 'session.json'
+        if os.path.exists(session_file):
+            try:
+                self.cl.load_settings(session_file)
+                # Verify session is valid
+                self.cl.user_info(self.username)
+                print("Session loaded successfully.")
+            except Exception as e:
+                print(f"Session invalid ({e}), logging in...")
+                self.cl.login(self.username, self.password)
+                self.cl.dump_settings(session_file)
+                print("Login successful and session saved.")
+        else:
+            print("No session file found, logging in...")
             self.cl.login(self.username, self.password)
-            print("Login successful.")
-        except Exception as e:
-            print(f"Error logging in to Instagram: {e}")
-            raise
+            self.cl.dump_settings(session_file)
+            print("Login successful and session saved.")
 
     def get_reels(self, usernames):
         """
@@ -33,7 +43,7 @@ class Instagram:
                     if post.is_video and not post.is_story:
                         all_reels.append(post)
                 print(f"Found {len(all_reels)} total reels so far.")
-            except instaloader.exceptions.ProfileNotExist:
+            except instaloader.ProfileNotExistsException:
                 print(f"Profile @{username} does not exist.")
             except Exception as e:
                 print(f"An error occurred while fetching from @{username}: {e}")
