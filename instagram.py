@@ -65,17 +65,15 @@ class Instagram:
             print(f"Downloading reel from @{post.owner_username} (shortcode: {post.shortcode})...")
             self.L.download_post(post, target='temp_reels')
             video_path = None
+            thumbnail_path = None
             for f in os.listdir('temp_reels'):
                 if f.endswith('.mp4'):
                     video_path = os.path.join('temp_reels', f)
-                    break
+                elif f.endswith('.jpg'):
+                    thumbnail_path = os.path.join('temp_reels', f)
             if not video_path:
                 print("Error: .mp4 file not found after download.")
                 return None, None
-
-            # Download thumbnail
-            thumbnail_path = os.path.join('temp_reels', f"{post.shortcode}_thumb.jpg")
-            self.L.download_pic(thumbnail_path, post.display_url, post.date)
             print("Download complete.")
             return video_path, thumbnail_path
         except Exception as e:
