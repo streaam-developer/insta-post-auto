@@ -16,6 +16,9 @@ def main():
     # MongoDB credentials
     mongo_conn_str = config['Mongo']['connection_string']
     mongo_db_name = config['Mongo']['database_name']
+    proxy = config['Mongo'].get('proxy', '').strip()
+    if not proxy:
+        proxy = None
 
     # Get all Instagram sections
     instagram_sections = [s for s in config.sections() if s.startswith('Instagram_')]
@@ -40,7 +43,7 @@ def main():
         try:
             # Initialize Database and Instagram clients
             db = Database(mongo_conn_str, mongo_db_name, mongo_collection_name, mongo_available_collection_name)
-            insta = Instagram(insta_username, insta_password)
+            insta = Instagram(insta_username, insta_password, proxy)
 
             # Fetch all reels from source accounts
             all_reels = insta.get_reels(source_accounts)
