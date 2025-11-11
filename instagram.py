@@ -3,6 +3,7 @@ from instagrapi import Client
 from instagrapi.types import Media
 import os
 from datetime import datetime, timedelta
+import time
 
 class Instagram:
     def __init__(self, username, password):
@@ -41,7 +42,7 @@ class Instagram:
                 print(f"Fetching reels from @{username}...")
                 profile = instaloader.Profile.from_username(self.L.context, username)
                 count = 0
-                max_posts = 100
+                max_posts = 10
                 cutoff_date = datetime.now() - timedelta(days=7)
                 for post in profile.get_posts():
                     if count >= max_posts:
@@ -50,10 +51,12 @@ class Instagram:
                         all_reels.append(post)
                         count += 1
                 print(f"Found {len(all_reels)} total reels so far.")
+                time.sleep(10)  # Delay to avoid rate limiting
             except instaloader.ProfileNotExistsException:
                 print(f"Profile @{username} does not exist.")
             except Exception as e:
                 print(f"An error occurred while fetching from @{username}: {e}")
+                time.sleep(10)  # Delay even on error
         return all_reels
 
     def download_reel(self, post):
