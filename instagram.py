@@ -92,3 +92,13 @@ class Instagram:
         except Exception as e:
             print(f"Error uploading reel: {e}")
             return None
+
+    def get_post_by_shortcode(self, shortcode):
+        """
+        Fetches a post by its shortcode.
+        """
+        try:
+            return instaloader.Post.from_shortcode(self.L.context, shortcode)
+        except Exception as e:
+            print(f"Error getting post {shortcode}: {e}")
+            return None

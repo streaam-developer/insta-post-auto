@@ -21,6 +21,7 @@ def main():
     mongo_conn_str = config['Mongo']['connection_string']
     mongo_db_name = config['Mongo']['database_name']
     mongo_collection_name = config['Mongo']['collection_name']
+    mongo_available_collection_name = config['Mongo']['available_collection_name']
 
     # Check for placeholder credentials
     if 'YOUR_INSTAGRAM_USERNAME' in insta_username or 'YOUR_MONGODB_CONNECTION_STRING' in mongo_conn_str:
@@ -29,7 +30,7 @@ def main():
 
     try:
         # Initialize Database and Instagram clients
-        db = Database(mongo_conn_str, mongo_db_name, mongo_collection_name)
+        db = Database(mongo_conn_str, mongo_db_name, mongo_collection_name, mongo_available_collection_name)
         insta = Instagram(insta_username, insta_password)
 
         # Fetch all reels from source accounts
@@ -39,18 +40,28 @@ def main():
             print("No reels found from the source accounts.")
             return
 
-        # Filter out already posted reels
-        print("Filtering out already posted reels...")
-        new_reels = [reel for reel in all_reels if not db.check_if_posted(reel.shortcode)]
+        # Save fetched reels to database
+        db.add_available_reels(all_reels)
 
-        if not new_reels:
-            print("No new reels to post. Everything is up to date.")
+        # Get available reels not posted from database
+        print("Getting available reels not posted...")
+        available_docs = db.get_available_not_posted()
+
+        if not available_docs:
+            print("No new reels available to post.")
             return
 
-        print(f"Found {len(new_reels)} new reels to choose from.")
+        print(f"Found {len(available_docs)} available reels to choose from.")
 
-        # Select a random reel
-        random_reel = random.choice(new_reels)
+        # Select a random reel doc
+        random_doc = random.choice(available_docs)
+        shortcode = random_doc["shortcode"]
+
+        # Fetch the post by shortcode
+        random_reel = insta.get_post_by_shortcode(shortcode)
+        if not random_reel:
+            print("Failed to fetch the selected reel.")
+            return
         
         # Create a temporary directory for downloads
         if not os.path.exists('temp_reels'):
