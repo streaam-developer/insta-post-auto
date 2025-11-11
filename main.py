@@ -57,14 +57,14 @@ def main():
             os.makedirs('temp_reels')
 
         # Download the reel
-        video_path = insta.download_reel(random_reel)
+        video_path, thumbnail_path = insta.download_reel(random_reel)
 
         if video_path:
             # Create a caption
-            caption = f"Credits: @{random_reel.owner_username}\n\n#reels #instagram #trending"
+            caption = random_reel.caption
 
             # Upload the reel
-            if insta.upload_reel(video_path, caption):
+            if insta.upload_reel(video_path, caption, thumbnail_path):
                 # Add to database if upload was successful
                 db.add_posted_reel(random_reel.shortcode)
                 print(f"Successfully posted reel {random_reel.shortcode} and updated database.")

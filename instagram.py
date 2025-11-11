@@ -41,7 +41,7 @@ class Instagram:
                 print(f"Fetching reels from @{username}...")
                 profile = instaloader.Profile.from_username(self.L.context, username)
                 count = 0
-                max_posts = 20
+                max_posts = 100
                 cutoff_date = datetime.now() - timedelta(days=7)
                 for post in profile.get_posts():
                     if count >= max_posts:
@@ -58,34 +58,37 @@ class Instagram:
 
     def download_reel(self, post):
         """
-        Downloads a single reel.
-        Returns the path to the video file.
+        Downloads a single reel and its thumbnail.
+        Returns the paths to the video file and thumbnail.
         """
         try:
             print(f"Downloading reel from @{post.owner_username} (shortcode: {post.shortcode})...")
             self.L.download_post(post, target='temp_reels')
             video_path = None
-            for f in os.listdir(f'temp_reels'):
+            for f in os.listdir('temp_reels'):
                 if f.endswith('.mp4'):
                     video_path = os.path.join('temp_reels', f)
                     break
-            if video_path:
-                print("Download complete.")
-                return video_path
-            else:
+            if not video_path:
                 print("Error: .mp4 file not found after download.")
-                return None
+                return None, None
+
+            # Download thumbnail
+            thumbnail_path = os.path.join('temp_reels', f"{post.shortcode}_thumb.jpg")
+            self.L.download_pic(thumbnail_path, post.display_url, post.date)
+            print("Download complete.")
+            return video_path, thumbnail_path
         except Exception as e:
             print(f"Error downloading reel: {e}")
-            return None
+            return None, None
 
-    def upload_reel(self, video_path, caption):
+    def upload_reel(self, video_path, caption, thumbnail_path=None):
         """
         Uploads a reel to the logged-in account.
         """
         try:
             print("Uploading reel...")
-            media = self.cl.video_upload(video_path, caption=caption)
+            media = self.cl.video_upload(video_path, caption=caption, thumbnail=thumbnail_path)
             print("Upload successful!")
             return media
         except Exception as e:
