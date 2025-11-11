@@ -2,6 +2,7 @@ import instaloader
 from instagrapi import Client
 from instagrapi.types import Media
 import os
+from datetime import datetime, timedelta
 
 class Instagram:
     def __init__(self, username, password):
@@ -39,9 +40,15 @@ class Instagram:
             try:
                 print(f"Fetching reels from @{username}...")
                 profile = instaloader.Profile.from_username(self.L.context, username)
+                count = 0
+                max_posts = 20
+                cutoff_date = datetime.now() - timedelta(days=7)
                 for post in profile.get_posts():
-                    if post.is_video and not post.is_story:
+                    if count >= max_posts:
+                        break
+                    if post.is_video and post.date > cutoff_date:
                         all_reels.append(post)
+                        count += 1
                 print(f"Found {len(all_reels)} total reels so far.")
             except instaloader.ProfileNotExistsException:
                 print(f"Profile @{username} does not exist.")
