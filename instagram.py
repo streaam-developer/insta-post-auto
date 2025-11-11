@@ -10,11 +10,11 @@ class Instagram:
         """
         Initializes the Instagram clients.
         """
-        self.L = instaloader.Instaloader()
+        self.L = instaloader.Instaloader(user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36')
         self.cl = Client()
         self.username = username
         self.password = password
-        session_file = 'session.json'
+        session_file = f'session_{self.username}.json'
         if os.path.exists(session_file):
             try:
                 self.cl.load_settings(session_file)
