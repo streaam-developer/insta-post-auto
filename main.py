@@ -12,23 +12,31 @@ def main():
     config = configparser.ConfigParser()
     config.read('config.ini')
 
-    # Instagram credentials
-    insta_username = config['Instagram']['username']
-    insta_password = config['Instagram']['password']
-    source_accounts = [acc.strip() for acc in config['Instagram']['source_accounts'].split(',')]
-
     # MongoDB credentials
     mongo_conn_str = config['Mongo']['connection_string']
     mongo_db_name = config['Mongo']['database_name']
-    mongo_collection_name = config['Mongo']['collection_name']
-    mongo_available_collection_name = config['Mongo']['available_collection_name']
 
-    # Check for placeholder credentials
-    if 'YOUR_INSTAGRAM_USERNAME' in insta_username or 'YOUR_MONGODB_CONNECTION_STRING' in mongo_conn_str:
-        print("Please update the config.ini file with your actual credentials.")
-        return
+    # Get all Instagram sections
+    instagram_sections = [s for s in config.sections() if s.startswith('Instagram_')]
 
-    try:
+    for section in instagram_sections:
+        print(f"\nProcessing account: {section}")
+
+        # Instagram credentials for this account
+        insta_username = config[section]['username']
+        insta_password = config[section]['password']
+        source_accounts = [acc.strip() for acc in config[section]['source_accounts'].split(',')]
+
+        # Account-specific collections
+        mongo_collection_name = f"posted_reels_{insta_username}"
+        mongo_available_collection_name = f"available_reels_{insta_username}"
+
+        # Check for placeholder credentials
+        if 'YOUR_INSTAGRAM_USERNAME' in insta_username or 'YOUR_MONGODB_CONNECTION_STRING' in mongo_conn_str:
+            print("Please update the config.ini file with your actual credentials.")
+            continue
+
+        try:
         # Initialize Database and Instagram clients
         db = Database(mongo_conn_str, mongo_db_name, mongo_collection_name, mongo_available_collection_name)
         insta = Instagram(insta_username, insta_password)
@@ -38,7 +46,7 @@ def main():
 
         if not all_reels:
             print("No reels found from the source accounts.")
-            return
+            continue
 
         # Save fetched reels to database
         db.add_available_reels(all_reels)
@@ -49,7 +57,7 @@ def main():
 
         if not available_docs:
             print("No new reels available to post.")
-            return
+            continue
 
         print(f"Found {len(available_docs)} available reels to choose from.")
 
@@ -61,7 +69,7 @@ def main():
         random_reel = insta.get_post_by_shortcode(shortcode)
         if not random_reel:
             print("Failed to fetch the selected reel.")
-            return
+            continue
         
         # Create a temporary directory for downloads
         if not os.path.exists('temp_reels'):
@@ -87,8 +95,8 @@ def main():
             shutil.rmtree('temp_reels')
             print("Cleaned up temporary files.")
 
-    except Exception as e:
-        print(f"An unexpected error occurred in the main script: {e}")
+        except Exception as e:
+            print(f"An unexpected error occurred for account {insta_username}: {e}")
         # Clean up just in case
         if os.path.exists('temp_reels'):
             shutil.rmtree('temp_reels')
