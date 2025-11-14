@@ -6,16 +6,14 @@ from datetime import datetime, timedelta
 import time
 
 class Instagram:
-    def __init__(self, username, password, proxy=None):
+    def __init__(self, username, password):
         """
         Initializes the Instagram clients.
         """
         self.username = username
         self.password = password
-        self.proxy = proxy
-        proxies = {'http': proxy, 'https': proxy} if proxy else None
-        self.L = instaloader.Instaloader(user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36', proxies=proxies)
-        self.cl = Client(proxy=proxy)
+        self.L = instaloader.Instaloader(user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36')
+        self.cl = Client()
         session_file = f'session_{self.username}.json'
         if os.path.exists(session_file):
             try:
