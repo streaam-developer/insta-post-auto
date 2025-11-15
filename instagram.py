@@ -48,7 +48,7 @@ class Instagram:
                 logging.info(f"Fetching reels from @{username}...")
                 profile = instaloader.Profile.from_username(self.L.context, username)
                 count = 0
-                async for post in profile.get_posts():
+                for post in profile.get_posts():
                     if count >= max_posts:
                         break
                     if post.is_video and post.date > cutoff_date:
