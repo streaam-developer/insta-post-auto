@@ -56,10 +56,16 @@ A comprehensive automation system for scheduling and posting Instagram reels wit
    ```
 
 4. Create initial user:
-   Run Python shell:
+   Run the create_user.py script:
+   ```bash
+   python create_user.py
+   ```
+   Or manually in Python shell:
    ```python
    from database import Database
    import os
+   from dotenv import load_dotenv
+   load_dotenv()
    db = Database(os.getenv('MONGO_CONNECTION_STRING'), os.getenv('MONGO_DATABASE_NAME'))
    db.create_user('admin', 'password', 'admin')
    ```
