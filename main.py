@@ -1,106 +1,131 @@
-import configparser
-import random
 import os
+import random
 import shutil
-import time
+import asyncio
+import logging
+from dotenv import load_dotenv
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from database import Database
 from instagram import Instagram
 
-def main():
+async def process_account(username, password, source_accounts, db_conn_str, db_name, max_posts, days_cutoff):
     """
-    Main function to run the Instagram automation script.
+    Asynchronously processes a single Instagram account.
     """
-    config = configparser.ConfigParser()
-    config.read('config.ini')
+    logging.info(f"Processing account: {username}")
 
-    # MongoDB credentials
-    mongo_conn_str = config['Mongo']['connection_string']
-    mongo_db_name = config['Mongo']['database_name']
+    # Account-specific collections
+    mongo_collection_name = f"posted_reels_{username}"
+    mongo_available_collection_name = f"available_reels_{username}"
 
-    # Get all Instagram sections
-    instagram_sections = [s for s in config.sections() if s.startswith('Instagram_')]
+    try:
+        # Initialize Database and Instagram clients
+        db = Database(db_conn_str, db_name, mongo_collection_name, mongo_available_collection_name)
+        insta = Instagram(username, password)
 
-    for section in instagram_sections:
-        print(f"\nProcessing account: {section}")
+        # Fetch all reels from source accounts
+        all_reels = await insta.get_reels(source_accounts, max_posts, days_cutoff)
 
-        # Instagram credentials for this account
-        insta_username = config[section]['username']
-        insta_password = config[section]['password']
-        source_accounts = [acc.strip() for acc in config[section]['source_accounts'].split(',')]
+        if not all_reels:
+            logging.warning("No reels found from the source accounts.")
+            return
 
-        # Account-specific collections
-        mongo_collection_name = f"posted_reels_{insta_username}"
-        mongo_available_collection_name = f"available_reels_{insta_username}"
+        # Save fetched reels to database
+        db.add_available_reels(all_reels)
 
-        # Check for placeholder credentials
-        if 'YOUR_INSTAGRAM_USERNAME' in insta_username or 'YOUR_MONGODB_CONNECTION_STRING' in mongo_conn_str:
-            print("Please update the config.ini file with your actual credentials.")
-            continue
+        # Get available reels not posted from database
+        logging.info("Getting available reels not posted...")
+        available_docs = db.get_available_not_posted()
 
-        try:
-            # Initialize Database and Instagram clients
-            db = Database(mongo_conn_str, mongo_db_name, mongo_collection_name, mongo_available_collection_name)
-            insta = Instagram(insta_username, insta_password)
+        if not available_docs:
+            logging.info("No new reels available to post.")
+            return
 
-            # Fetch all reels from source accounts
-            all_reels = insta.get_reels(source_accounts)
+        logging.info(f"Found {len(available_docs)} available reels to choose from.")
 
-            if not all_reels:
-                print("No reels found from the source accounts.")
-                continue
+        # Select a random reel doc
+        random_doc = random.choice(available_docs)
+        shortcode = random_doc["shortcode"]
 
-            # Save fetched reels to database
-            db.add_available_reels(all_reels)
+        # Fetch the post by shortcode
+        random_reel = await insta.get_post_by_shortcode(shortcode)
+        if not random_reel:
+            logging.error("Failed to fetch the selected reel.")
+            return
 
-            # Get available reels not posted from database
-            print("Getting available reels not posted...")
-            available_docs = db.get_available_not_posted()
+        # Create a temporary directory for downloads
+        if not os.path.exists('temp_reels'):
+            os.makedirs('temp_reels')
 
-            if not available_docs:
-                print("No new reels available to post.")
-                continue
+        # Download the reel
+        video_path, thumbnail_path = await insta.download_reel(random_reel)
 
-            print(f"Found {len(available_docs)} available reels to choose from.")
+        if video_path:
+            # Create a caption
+            caption = random_reel.caption
 
-            # Select a random reel doc
-            random_doc = random.choice(available_docs)
-            shortcode = random_doc["shortcode"]
+            # Upload the reel
+            if await insta.upload_reel(video_path, caption, thumbnail_path):
+                # Add to database if upload was successful
+                db.add_posted_reel(random_reel.shortcode)
+                logging.info(f"Successfully posted reel {random_reel.shortcode} and updated database.")
+            else:
+                logging.error(f"Failed to upload reel {random_reel.shortcode}.")
 
-            # Fetch the post by shortcode
-            random_reel = insta.get_post_by_shortcode(shortcode)
-            if not random_reel:
-                print("Failed to fetch the selected reel.")
-                continue
+        # Clean up the temporary directory
+        if os.path.exists('temp_reels'):
+            shutil.rmtree('temp_reels')
+            logging.info("Cleaned up temporary files.")
 
-            # Create a temporary directory for downloads
-            if not os.path.exists('temp_reels'):
-                os.makedirs('temp_reels')
+    except Exception as e:
+        logging.error(f"An unexpected error occurred for account {username}: {e}")
+        # Clean up just in case
+        if os.path.exists('temp_reels'):
+            shutil.rmtree('temp_reels')
 
-            # Download the reel
-            video_path, thumbnail_path = insta.download_reel(random_reel)
+async def main():
+    """
+    Main async function to run the Instagram automation script.
+    """
+    load_dotenv()
 
-            if video_path:
-                # Create a caption
-                caption = random_reel.caption
+    # Set up logging
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-                # Upload the reel
-                if insta.upload_reel(video_path, caption, thumbnail_path):
-                    # Add to database if upload was successful
-                    db.add_posted_reel(random_reel.shortcode)
-                    print(f"Successfully posted reel {random_reel.shortcode} and updated database.")
-                else:
-                    print(f"Failed to upload reel {random_reel.shortcode}.")
+    # Load environment variables
+    mongo_conn_str = os.getenv('MONGO_CONNECTION_STRING')
+    mongo_db_name = os.getenv('MONGO_DATABASE_NAME')
+    max_posts = int(os.getenv('MAX_POSTS_PER_ACCOUNT', 10))
+    days_cutoff = int(os.getenv('DAYS_CUTOFF', 7))
 
-            # Clean up the temporary directory
-            if os.path.exists('temp_reels'):
-                shutil.rmtree('temp_reels')
-                print("Cleaned up temporary files.")
+    # Load accounts from env
+    accounts = []
+    i = 1
+    while True:
+        username = os.getenv(f'INSTA_USERNAME_{i}')
+        password = os.getenv(f'INSTA_PASSWORD_{i}')
+        source_accounts = os.getenv(f'INSTA_SOURCE_ACCOUNTS_{i}')
+        if not username or not password or not source_accounts:
+            break
+        source_accounts = [acc.strip() for acc in source_accounts.split(',')]
+        accounts.append((username, password, source_accounts))
+        i += 1
 
-        except Exception as e:
-            print(f"An unexpected error occurred for account {insta_username}: {e}")
-            # Clean up just in case
-            if os.path.exists('temp_reels'):
-                shutil.rmtree('temp_reels')
+    if not accounts:
+        logging.error("No Instagram accounts configured in .env")
+        return
+
+    # Process accounts concurrently
+    tasks = [process_account(username, password, source_accounts, mongo_conn_str, mongo_db_name, max_posts, days_cutoff) for username, password, source_accounts in accounts]
+    await asyncio.gather(*tasks)
+
+def schedule_posts():
+    """
+    Function to schedule the main process.
+    """
+    scheduler = AsyncIOScheduler()
+    scheduler.add_job(main, 'interval', hours=24)  # Run daily
+    scheduler.start()
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

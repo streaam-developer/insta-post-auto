@@ -1,4 +1,5 @@
 from pymongo import MongoClient
+import logging
 
 class Database:
     def __init__(self, connection_string, database_name, collection_name, available_collection_name):
@@ -12,9 +13,9 @@ class Database:
             self.available_collection = self.db[available_collection_name]
             # Test the connection
             self.client.server_info()
-            print("Successfully connected to MongoDB.")
+            logging.info("Successfully connected to MongoDB.")
         except Exception as e:
-            print(f"Error connecting to MongoDB: {e}")
+            logging.error(f"Error connecting to MongoDB: {e}")
             raise
 
     def check_if_posted(self, reel_shortcode):
@@ -36,9 +37,9 @@ class Database:
         docs = [{"shortcode": p.shortcode, "owner_username": p.owner_username, "caption": p.caption, "date": p.date} for p in posts]
         try:
             self.available_collection.insert_many(docs, ordered=False)
-            print(f"Added {len(docs)} reels to available collection.")
+            logging.info(f"Added {len(docs)} reels to available collection.")
         except Exception as e:
-            print(f"Error adding available reels: {e}")
+            logging.error(f"Error adding available reels: {e}")
 
     def get_available_not_posted(self):
         """

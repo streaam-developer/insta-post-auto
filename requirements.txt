@@ -1,3 +1,9 @@
 instaloader
 instagrapi
 pymongo
+asyncio
+aiofiles
+APScheduler
+Flask
+python-dotenv
+tenacity

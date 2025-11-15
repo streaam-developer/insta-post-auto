@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instagram Automation Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .account { margin-bottom: 20px; border: 1px solid #ccc; padding: 10px; }
+        canvas { max-width: 400px; }
+    </style>
+</head>
+<body>
+    <h1>Instagram Automation Dashboard</h1>
+    <div id="accounts"></div>
+
+    <script>
+        async function loadDashboard() {
+            const response = await fetch('/api/accounts');
+            const accounts = await response.json();
+            const container = document.getElementById('accounts');
+
+            for (const username of accounts) {
+                const accountDiv = document.createElement('div');
+                accountDiv.className = 'account';
+                accountDiv.innerHTML = `<h2>${username}</h2><canvas id="chart-${username}"></canvas>`;
+                container.appendChild(accountDiv);
+
+                const reelsResponse = await fetch(`/api/reels/${username}`);
+                const reels = await reelsResponse.json();
+
+                new Chart(document.getElementById(`chart-${username}`), {
+                    type: 'bar',
+                    data: {
+                        labels: ['Posted', 'Available'],
+                        datasets: [{
+                            label: 'Reels',
+                            data: [reels.posted.length, reels.available.length],
+                            backgroundColor: ['#ff6384', '#36a2eb']
+                        }]
+                    }
+                });
+            }
+        }
+
+        loadDashboard();
+    </script>
+</body>
+</html>
