@@ -136,12 +136,35 @@ def run_flask():
     """
     app.run(debug=True, host='0.0.0.0', port=5000, use_reloader=False)
 
+async def main_entry():
+    """
+    Main entry point to run initial process and start scheduler.
+    """
+    # Run initial process
+    await main()
+
+    # Start scheduler
+    scheduler = AsyncIOScheduler()
+    scheduler.add_job(main, 'interval', hours=5)
+    scheduler.start()
+
+    # Keep the event loop running
+    try:
+        while True:
+            await asyncio.sleep(1)
+    except KeyboardInterrupt:
+        logging.info("Shutting down scheduler...")
+        scheduler.shutdown()
+        logging.info("Scheduler shut down.")
+
 if __name__ == "__main__":
     # Start Flask app in a separate thread
     flask_thread = threading.Thread(target=run_flask)
     flask_thread.daemon = True
     flask_thread.start()
 
-    # Run initial process and start scheduler
-    asyncio.run(main())
-    schedule_posts()
+    # Run the async main entry
+    try:
+        asyncio.run(main_entry())
+    except KeyboardInterrupt:
+        logging.info("Application stopped by user.")
