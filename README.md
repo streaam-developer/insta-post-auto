@@ -65,8 +65,7 @@ A comprehensive automation system for scheduling and posting Instagram reels wit
    ```
 
 5. Run the application:
-   - For automation: `python main.py`
-   - For dashboard: `python app.py`
+   - `python main.py` (starts both automation and dashboard)
 
    Access dashboard at http://localhost:5000
 

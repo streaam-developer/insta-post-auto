@@ -20,6 +20,5 @@
 - [ ] Install dependencies: `pip install -r requirements.txt`
 - [ ] Set up MongoDB and Instagram accounts in .env
 - [ ] Create admin user via Python shell
-- [ ] Run automation: `python main.py`
-- [ ] Run dashboard: `python app.py`
-- [ ] Access at http://localhost:5000
+- [ ] Run the system: `python main.py` (starts automation and dashboard)
+- [ ] Access dashboard at http://localhost:5000

@@ -3,10 +3,12 @@ import random
 import shutil
 import asyncio
 import logging
+import threading
 from dotenv import load_dotenv
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from database import Database
 from instagram import Instagram
+from app import app
 
 async def process_account(username, password, source_accounts, db_conn_str, db_name, max_posts, days_cutoff):
     """
@@ -128,5 +130,18 @@ def schedule_posts():
     scheduler.add_job(main, 'interval', hours=5)  # Run every 5 hours
     scheduler.start()
 
+def run_flask():
+    """
+    Run the Flask app in a separate thread.
+    """
+    app.run(debug=True, host='0.0.0.0', port=5000, use_reloader=False)
+
 if __name__ == "__main__":
+    # Start Flask app in a separate thread
+    flask_thread = threading.Thread(target=run_flask)
+    flask_thread.daemon = True
+    flask_thread.start()
+
+    # Run initial process and start scheduler
     asyncio.run(main())
+    schedule_posts()
