@@ -32,9 +32,13 @@ class Instagram:
                 print("Login successful and session saved.")
         else:
             print("No session file found, logging in...")
-            self.cl.login(self.username, self.password)
-            self.cl.dump_settings(session_file)
-            print("Login successful and session saved.")
+            try:
+                self.cl.login(self.username, self.password)
+                self.cl.dump_settings(session_file)
+                print("Login successful and session saved.")
+            except Exception as e:
+                print(f"Login failed: {e}")
+                raise
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
     async def get_reels(self, usernames, max_posts=10, days_cutoff=7):

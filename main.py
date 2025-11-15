@@ -116,15 +116,15 @@ async def check_and_post():
         logging.error("No Instagram accounts configured in .env")
         return
 
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
 
     # Check each account
     for username, password, source_accounts in accounts:
         last_post_time = db.get_last_post_time(username)
-        if last_post_time is None or (datetime.utcnow() - last_post_time) >= timedelta(hours=5):
+        if last_post_time is None or (datetime.now(timezone.utc) - last_post_time) >= timedelta(hours=5):
             logging.info(f"Posting for account {username}")
             await process_account(username, password, source_accounts, mongo_conn_str, mongo_db_name, max_posts, days_cutoff)
-            db.update_last_post_time(username, datetime.utcnow())
+            db.update_last_post_time(username, datetime.now(timezone.utc))
         else:
             logging.info(f"Account {username} not ready to post yet")
 
