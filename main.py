@@ -86,20 +86,18 @@ async def process_account(username, password, source_accounts, db_conn_str, db_n
         if os.path.exists('temp_reels'):
             shutil.rmtree('temp_reels')
 
-async def main():
+async def check_and_post():
     """
-    Main async function to run the Instagram automation script.
+    Check each account and post if 5 hours have passed since last post.
     """
     load_dotenv()
-
-    # Set up logging
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
     # Load environment variables
     mongo_conn_str = os.getenv('MONGO_CONNECTION_STRING')
     mongo_db_name = os.getenv('MONGO_DATABASE_NAME')
     max_posts = int(os.getenv('MAX_POSTS_PER_ACCOUNT', 10))
     days_cutoff = int(os.getenv('DAYS_CUTOFF', 7))
+    db = Database(mongo_conn_str, mongo_db_name)
 
     # Load accounts from env
     accounts = []
@@ -118,16 +116,24 @@ async def main():
         logging.error("No Instagram accounts configured in .env")
         return
 
-    # Process accounts concurrently
-    tasks = [process_account(username, password, source_accounts, mongo_conn_str, mongo_db_name, max_posts, days_cutoff) for username, password, source_accounts in accounts]
-    await asyncio.gather(*tasks)
+    from datetime import datetime, timedelta
+
+    # Check each account
+    for username, password, source_accounts in accounts:
+        last_post_time = db.get_last_post_time(username)
+        if last_post_time is None or (datetime.utcnow() - last_post_time) >= timedelta(hours=5):
+            logging.info(f"Posting for account {username}")
+            await process_account(username, password, source_accounts, mongo_conn_str, mongo_db_name, max_posts, days_cutoff)
+            db.update_last_post_time(username, datetime.utcnow())
+        else:
+            logging.info(f"Account {username} not ready to post yet")
 
 def schedule_posts():
     """
-    Function to schedule the main process every 5 hours.
+    Function to schedule the check_and_post process every 30 minutes.
     """
     scheduler = AsyncIOScheduler()
-    scheduler.add_job(main, 'interval', hours=5)  # Run every 5 hours
+    scheduler.add_job(check_and_post, 'interval', minutes=30)  # Check every 30 minutes
     scheduler.start()
 
 def run_flask():
@@ -138,14 +144,14 @@ def run_flask():
 
 async def main_entry():
     """
-    Main entry point to run initial process and start scheduler.
+    Main entry point to run initial check and start scheduler.
     """
-    # Run initial process
-    await main()
+    # Run initial check
+    await check_and_post()
 
     # Start scheduler
     scheduler = AsyncIOScheduler()
-    scheduler.add_job(main, 'interval', hours=5)
+    scheduler.add_job(check_and_post, 'interval', minutes=30)
     scheduler.start()
 
     # Keep the event loop running

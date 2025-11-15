@@ -178,3 +178,21 @@ class Database:
         Gets alerts for a user.
         """
         return list(self.db.alerts.find({"user_id": user_id, "enabled": True}, {"_id": 0}))
+
+    # Account status
+    def get_last_post_time(self, account_username):
+        """
+        Gets the last post time for an account.
+        """
+        status = self.db.account_status.find_one({"account_username": account_username})
+        return status.get("last_post_time") if status else None
+
+    def update_last_post_time(self, account_username, time):
+        """
+        Updates the last post time for an account.
+        """
+        self.db.account_status.update_one(
+            {"account_username": account_username},
+            {"$set": {"last_post_time": time}},
+            upsert=True
+        )
