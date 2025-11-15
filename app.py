@@ -5,6 +5,7 @@ import os
 from dotenv import load_dotenv
 from datetime import datetime
 import openai
+from bson import ObjectId
 
 load_dotenv()
 
@@ -28,7 +29,7 @@ class User(UserMixin):
 
 @login_manager.user_loader
 def load_user(user_id):
-    user_doc = db.db.users.find_one({"_id": user_id})
+    user_doc = db.db.users.find_one({"_id": ObjectId(user_id)})
     return User(user_doc) if user_doc else None
 
 @app.route('/login', methods=['GET', 'POST'])
