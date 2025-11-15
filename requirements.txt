@@ -5,5 +5,8 @@ asyncio
 aiofiles
 APScheduler
 Flask
+Flask-Login
 python-dotenv
 tenacity
+werkzeug
+openai

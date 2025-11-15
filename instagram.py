@@ -113,3 +113,22 @@ class Instagram:
         except Exception as e:
             logging.error(f"Error getting post {shortcode}: {e}")
             return None
+
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
+    async def get_reel_analytics(self, media_id):
+        """
+        Fetches analytics for a posted reel.
+        """
+        try:
+            media_info = await asyncio.to_thread(self.cl.media_info, media_id)
+            analytics = {
+                "views": getattr(media_info, 'view_count', 0),
+                "likes": getattr(media_info, 'like_count', 0),
+                "comments": getattr(media_info, 'comment_count', 0),
+                "shares": getattr(media_info, 'share_count', 0) if hasattr(media_info, 'share_count') else 0,
+                "engagement_rate": 0  # Calculate if needed
+            }
+            return analytics
+        except Exception as e:
+            logging.error(f"Error fetching analytics for media {media_id}: {e}")
+            return None

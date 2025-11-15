@@ -7,24 +7,62 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; }
+        .header { display: flex; justify-content: space-between; align-items: center; }
+        .tabs { display: flex; margin-bottom: 20px; }
+        .tab { padding: 10px; cursor: pointer; background: #f0f0f0; border: 1px solid #ccc; }
+        .tab.active { background: #007bff; color: white; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
         .account { margin-bottom: 20px; border: 1px solid #ccc; padding: 10px; }
         canvas { max-width: 400px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        .logout { background: #dc3545; color: white; padding: 10px; text-decoration: none; border-radius: 4px; }
     </style>
 </head>
 <body>
-    <h1>Instagram Automation Dashboard</h1>
-    <div id="accounts"></div>
+    <div class="header">
+        <h1>Instagram Automation Dashboard</h1>
+        <a href="/logout" class="logout">Logout</a>
+    </div>
+    <div class="tabs">
+        <div class="tab active" onclick="showTab('overview')">Overview</div>
+        <div class="tab" onclick="showTab('analytics')">Analytics</div>
+        <div class="tab" onclick="showTab('logs')">Logs</div>
+        <div class="tab" onclick="showTab('queue')">Queue</div>
+    </div>
+    <div id="overview" class="tab-content active">
+        <h2>Overview</h2>
+        <div id="accounts"></div>
+    </div>
+    <div id="analytics" class="tab-content">
+        <h2>Analytics</h2>
+        <div id="analytics-content"></div>
+    </div>
+    <div id="logs" class="tab-content">
+        <h2>Activity Logs</h2>
+        <div id="logs-content"></div>
+    </div>
+    <div id="queue" class="tab-content">
+        <h2>Posting Queue</h2>
+        <div id="queue-content"></div>
+    </div>
 
     <script>
-        async function loadDashboard() {
-            const response = await fetch('/api/accounts');
-            const accounts = await response.json();
-            const container = document.getElementById('accounts');
+        let accounts = [];
 
+        async function loadAccounts() {
+            const response = await fetch('/api/accounts');
+            accounts = await response.json();
+        }
+
+        async function loadOverview() {
+            const container = document.getElementById('accounts');
+            container.innerHTML = '';
             for (const username of accounts) {
                 const accountDiv = document.createElement('div');
                 accountDiv.className = 'account';
-                accountDiv.innerHTML = `<h2>${username}</h2><canvas id="chart-${username}"></canvas>`;
+                accountDiv.innerHTML = `<h3>${username}</h3><canvas id="chart-${username}"></canvas>`;
                 container.appendChild(accountDiv);
 
                 const reelsResponse = await fetch(`/api/reels/${username}`);
@@ -44,7 +82,78 @@
             }
         }
 
-        loadDashboard();
+        async function loadAnalytics() {
+            const container = document.getElementById('analytics-content');
+            container.innerHTML = '';
+            for (const username of accounts) {
+                const response = await fetch(`/api/analytics/${username}`);
+                const data = await response.json();
+                const div = document.createElement('div');
+                div.className = 'account';
+                div.innerHTML = `
+                    <h3>${username}</h3>
+                    <p>Total Posts: ${data.total_posts}</p>
+                    <p>Total Views: ${data.total_views}</p>
+                    <p>Total Likes: ${data.total_likes}</p>
+                    <p>Total Shares: ${data.total_shares}</p>
+                    <p>Engagement Rate: ${data.engagement_rate}%</p>
+                `;
+                container.appendChild(div);
+            }
+        }
+
+        async function loadLogs() {
+            const container = document.getElementById('logs-content');
+            container.innerHTML = '';
+            for (const username of accounts) {
+                const response = await fetch(`/api/logs/${username}`);
+                const logs = await response.json();
+                const div = document.createElement('div');
+                div.className = 'account';
+                div.innerHTML = `<h3>${username}</h3><table><tr><th>Timestamp</th><th>Level</th><th>Message</th></tr>`;
+                logs.forEach(log => {
+                    div.innerHTML += `<tr><td>${log.timestamp}</td><td>${log.level}</td><td>${log.message}</td></tr>`;
+                });
+                div.innerHTML += '</table>';
+                container.appendChild(div);
+            }
+        }
+
+        async function loadQueue() {
+            const container = document.getElementById('queue-content');
+            container.innerHTML = '';
+            for (const username of accounts) {
+                const response = await fetch(`/api/queue/${username}`);
+                const queue = await response.json();
+                const div = document.createElement('div');
+                div.className = 'account';
+                div.innerHTML = `<h3>${username}</h3><table><tr><th>Shortcode</th><th>Scheduled Time</th><th>Status</th></tr>`;
+                queue.forEach(item => {
+                    div.innerHTML += `<tr><td>${item.shortcode}</td><td>${item.scheduled_time}</td><td>${item.status}</td></tr>`;
+                });
+                div.innerHTML += '</table>';
+                container.appendChild(div);
+            }
+        }
+
+        function showTab(tabName) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.querySelector(`.tab[onclick="showTab('${tabName}')"]`).classList.add('active');
+            document.getElementById(tabName).classList.add('active');
+
+            if (tabName === 'overview') loadOverview();
+            else if (tabName === 'analytics') loadAnalytics();
+            else if (tabName === 'logs') loadLogs();
+            else if (tabName === 'queue') loadQueue();
+        }
+
+        async function init() {
+            await loadAccounts();
+            loadOverview();
+        }
+
+        init();
     </script>
 </body>
 </html>

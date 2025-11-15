@@ -12,36 +12,32 @@ async def process_account(username, password, source_accounts, db_conn_str, db_n
     """
     Asynchronously processes a single Instagram account.
     """
-    logging.info(f"Processing account: {username}")
-
-    # Account-specific collections
-    mongo_collection_name = f"posted_reels_{username}"
-    mongo_available_collection_name = f"available_reels_{username}"
+    db = Database(db_conn_str, db_name)
+    db.log_activity("INFO", f"Processing account: {username}", username, "process_start")
 
     try:
-        # Initialize Database and Instagram clients
-        db = Database(db_conn_str, db_name, mongo_collection_name, mongo_available_collection_name)
+        # Initialize Instagram client
         insta = Instagram(username, password)
 
         # Fetch all reels from source accounts
         all_reels = await insta.get_reels(source_accounts, max_posts, days_cutoff)
 
         if not all_reels:
-            logging.warning("No reels found from the source accounts.")
+            db.log_activity("WARNING", "No reels found from the source accounts.", username, "fetch_reels")
             return
 
         # Save fetched reels to database
-        db.add_available_reels(all_reels)
+        db.add_available_reels(username, all_reels)
 
         # Get available reels not posted from database
-        logging.info("Getting available reels not posted...")
-        available_docs = db.get_available_not_posted()
+        db.log_activity("INFO", "Getting available reels not posted...", username, "get_available")
+        available_docs = db.get_available_not_posted(username)
 
         if not available_docs:
-            logging.info("No new reels available to post.")
+            db.log_activity("INFO", "No new reels available to post.", username, "no_available")
             return
 
-        logging.info(f"Found {len(available_docs)} available reels to choose from.")
+        db.log_activity("INFO", f"Found {len(available_docs)} available reels to choose from.", username, "available_count")
 
         # Select a random reel doc
         random_doc = random.choice(available_docs)
@@ -50,7 +46,7 @@ async def process_account(username, password, source_accounts, db_conn_str, db_n
         # Fetch the post by shortcode
         random_reel = await insta.get_post_by_shortcode(shortcode)
         if not random_reel:
-            logging.error("Failed to fetch the selected reel.")
+            db.log_activity("ERROR", "Failed to fetch the selected reel.", username, "fetch_reel")
             return
 
         # Create a temporary directory for downloads
@@ -65,20 +61,25 @@ async def process_account(username, password, source_accounts, db_conn_str, db_n
             caption = random_reel.caption
 
             # Upload the reel
-            if await insta.upload_reel(video_path, caption, thumbnail_path):
+            upload_result = await insta.upload_reel(video_path, caption, thumbnail_path)
+            if upload_result:
                 # Add to database if upload was successful
-                db.add_posted_reel(random_reel.shortcode)
-                logging.info(f"Successfully posted reel {random_reel.shortcode} and updated database.")
+                db.add_posted_reel(username, random_reel)
+                db.log_activity("INFO", f"Successfully posted reel {random_reel.shortcode}", username, "post_success")
+                # Fetch analytics after posting
+                analytics = await insta.get_reel_analytics(upload_result.id)
+                if analytics:
+                    db.update_post_analytics(random_reel.shortcode, analytics)
             else:
-                logging.error(f"Failed to upload reel {random_reel.shortcode}.")
+                db.log_activity("ERROR", f"Failed to upload reel {random_reel.shortcode}", username, "post_failure")
 
         # Clean up the temporary directory
         if os.path.exists('temp_reels'):
             shutil.rmtree('temp_reels')
-            logging.info("Cleaned up temporary files.")
+            db.log_activity("INFO", "Cleaned up temporary files.", username, "cleanup")
 
     except Exception as e:
-        logging.error(f"An unexpected error occurred for account {username}: {e}")
+        db.log_activity("ERROR", f"An unexpected error occurred: {e}", username, "error")
         # Clean up just in case
         if os.path.exists('temp_reels'):
             shutil.rmtree('temp_reels')
@@ -121,10 +122,10 @@ async def main():
 
 def schedule_posts():
     """
-    Function to schedule the main process.
+    Function to schedule the main process every 5 hours.
     """
     scheduler = AsyncIOScheduler()
-    scheduler.add_job(main, 'interval', hours=24)  # Run daily
+    scheduler.add_job(main, 'interval', hours=5)  # Run every 5 hours
     scheduler.start()
 
 if __name__ == "__main__":
