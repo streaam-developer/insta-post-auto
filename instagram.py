@@ -23,13 +23,21 @@ class Instagram:
             try:
                 self.cl.load_settings(session_file)
                 # Verify session is valid
-                self.cl.user_info(self.username)
+                logging.info(f"Attempting to verify session for {self.username}")
+                user_info = self.cl.user_info(self.username)
+                logging.info(f"Session verification successful for {self.username}: {user_info}")
                 print("Session loaded successfully.")
             except Exception as e:
+                logging.error(f"Session invalid for {self.username}: {e}")
                 print(f"Session invalid ({e}), logging in...")
-                self.cl.login(self.username, self.password)
-                self.cl.dump_settings(session_file)
-                print("Login successful and session saved.")
+                try:
+                    self.cl.login(self.username, self.password)
+                    self.cl.dump_settings(session_file)
+                    print("Login successful and session saved.")
+                except Exception as login_e:
+                    logging.error(f"Login failed for {self.username}: {login_e}")
+                    print(f"Login failed: {login_e}")
+                    raise
         else:
             print("No session file found, logging in...")
             try:
@@ -37,6 +45,7 @@ class Instagram:
                 self.cl.dump_settings(session_file)
                 print("Login successful and session saved.")
             except Exception as e:
+                logging.error(f"Login failed for {self.username}: {e}")
                 print(f"Login failed: {e}")
                 raise
 
