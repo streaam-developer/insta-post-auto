@@ -185,7 +185,8 @@ class Database:
         Gets the last post time for an account.
         """
         status = self.db.account_status.find_one({"account_username": account_username})
-        return status.get("last_post_time") if status else None
+        last_time = status.get("last_post_time") if status else None
+        return last_time.replace(tzinfo=timezone.utc) if last_time else None
 
     def update_last_post_time(self, account_username, time):
         """
