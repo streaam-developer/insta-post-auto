@@ -19,8 +19,14 @@ class Instagram:
         self.L = instaloader.Instaloader(user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36')
         self.cl = Client()
         if proxy:
-            self.cl.set_proxy(proxy)
-            logging.info(f"Set proxy for {username}: {proxy}")
+            # Assuming proxy is http://user:pass@ip:port or socks5://
+            if proxy.startswith("http"):
+                proxy_dict = {"http": proxy, "https": proxy}
+            else:
+                # If not http, assume socks5://user:pass@ip:port
+                proxy_dict = {"socks5": f"socks5://{proxy}"}
+            self.cl.set_proxy(proxy_dict)
+            logging.info(f"Set proxy for {username}: {proxy_dict}")
         session_file = f'session_{self.username}.json'
         if os.path.exists(session_file):
             try:
