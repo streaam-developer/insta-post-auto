@@ -10,7 +10,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 import logging
 
 class Instagram:
-    def __init__(self, username, password):
+    def __init__(self, username, password, proxy=None):
         """
         Initializes the Instagram clients.
         """
@@ -18,6 +18,9 @@ class Instagram:
         self.password = password
         self.L = instaloader.Instaloader(user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36')
         self.cl = Client()
+        if proxy:
+            self.cl.set_proxy(proxy)
+            logging.info(f"Set proxy for {username}: {proxy}")
         session_file = f'session_{self.username}.json'
         if os.path.exists(session_file):
             try:
@@ -29,23 +32,28 @@ class Instagram:
                 print("Session loaded successfully.")
             except Exception as e:
                 logging.error(f"Session invalid for {self.username}: {e}")
+                logging.error(f"Session exception type: {type(e).__name__}")
                 print(f"Session invalid ({e}), logging in...")
+                logging.info(f"Attempting login after invalid session for {self.username}")
                 try:
                     self.cl.login(self.username, self.password)
                     self.cl.dump_settings(session_file)
                     print("Login successful and session saved.")
                 except Exception as login_e:
                     logging.error(f"Login failed for {self.username}: {login_e}")
+                    logging.error(f"Login exception type: {type(login_e).__name__}")
                     print(f"Login failed: {login_e}")
                     raise
         else:
             print("No session file found, logging in...")
+            logging.info(f"Attempting fresh login for {self.username}")
             try:
                 self.cl.login(self.username, self.password)
                 self.cl.dump_settings(session_file)
                 print("Login successful and session saved.")
             except Exception as e:
                 logging.error(f"Login failed for {self.username}: {e}")
+                logging.error(f"Exception type: {type(e).__name__}")
                 print(f"Login failed: {e}")
                 raise
 

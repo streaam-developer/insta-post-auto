@@ -4,13 +4,14 @@ import shutil
 import asyncio
 import logging
 import threading
+import configparser
 from dotenv import load_dotenv
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from database import Database
 from instagram import Instagram
 from app import app
 
-async def process_account(username, password, source_accounts, db_conn_str, db_name, max_posts, days_cutoff):
+async def process_account(username, password, source_accounts, proxy, db_conn_str, db_name, max_posts, days_cutoff):
     """
     Asynchronously processes a single Instagram account.
     """
@@ -19,7 +20,7 @@ async def process_account(username, password, source_accounts, db_conn_str, db_n
 
     try:
         # Initialize Instagram client
-        insta = Instagram(username, password)
+        insta = Instagram(username, password, proxy)
 
         # Fetch all reels from source accounts
         all_reels = await insta.get_reels(source_accounts, max_posts, days_cutoff)
@@ -99,31 +100,32 @@ async def check_and_post():
     days_cutoff = int(os.getenv('DAYS_CUTOFF', 7))
     db = Database(mongo_conn_str, mongo_db_name)
 
-    # Load accounts from env
+    # Load accounts from config.ini
+    config = configparser.ConfigParser()
+    config.read('config.ini')
     accounts = []
-    i = 1
-    while True:
-        username = os.getenv(f'INSTA_USERNAME_{i}')
-        password = os.getenv(f'INSTA_PASSWORD_{i}')
-        source_accounts = os.getenv(f'INSTA_SOURCE_ACCOUNTS_{i}')
-        if not username or not password or not source_accounts:
-            break
-        source_accounts = [acc.strip() for acc in source_accounts.split(',')]
-        accounts.append((username, password, source_accounts))
-        i += 1
+    for section in config.sections():
+        if section.startswith('Instagram_'):
+            username = config[section].get('username')
+            password = config[section].get('password')
+            source_accounts = config[section].get('source_accounts')
+            proxy = config[section].get('proxy', '')
+            if username and password and source_accounts:
+                source_accounts = [acc.strip() for acc in source_accounts.split(',')]
+                accounts.append((username, password, source_accounts, proxy))
 
     if not accounts:
-        logging.error("No Instagram accounts configured in .env")
+        logging.error("No Instagram accounts configured in config.ini")
         return
 
     from datetime import datetime, timedelta, timezone
 
     # Check each account
-    for username, password, source_accounts in accounts:
+    for username, password, source_accounts, proxy in accounts:
         last_post_time = db.get_last_post_time(username)
         if last_post_time is None or (datetime.now(timezone.utc) - last_post_time) >= timedelta(hours=5):
             logging.info(f"Posting for account {username}")
-            await process_account(username, password, source_accounts, mongo_conn_str, mongo_db_name, max_posts, days_cutoff)
+            await process_account(username, password, source_accounts, proxy, mongo_conn_str, mongo_db_name, max_posts, days_cutoff)
             db.update_last_post_time(username, datetime.now(timezone.utc))
         else:
             logging.info(f"Account {username} not ready to post yet")
